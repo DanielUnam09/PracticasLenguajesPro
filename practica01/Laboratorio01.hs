@@ -9,3 +9,6 @@ sumaCuadradoPares :: [Int] -> Int
 sumaCuadradoPares xs =  sum (map ( ^2) (filter even xs))
 
 -- Ejercicio 3 
+
+aplicaTresVeces :: (a -> a) -> a -> a 
+aplicaTresVeces f x = (f (f (f x)))
