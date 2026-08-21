@@ -1,3 +1,4 @@
+module Laboratorio01 where
 
 -- Ejercicio 1 Distancia Euclidiana al origen
 distanciaOrigen :: Double -> Double -> Double 
@@ -5,8 +6,8 @@ distanciaOrigen x y = sqrt((x)^2 + (y)^2)
 
 -- Ejercicio 2 Cuadrados elementos pares de una lista
 
-sumaCuadradoPares :: [Int] -> Int
-sumaCuadradoPares xs =  sum (map ( ^2) (filter even xs))
+sumaCuadradosPares :: [Int] -> Int
+sumaCuadradosPares xs =  sum (map ( ^2) (filter even xs))
 
 -- Ejercicio 3 Aplica una función 3 veces al mismo valor. 
 
@@ -17,16 +18,16 @@ aplicaTresVeces f x = (f (f (f x)))
 varianza2 :: Double -> Double -> Double 
 varianza2 datoUno datoDos = 
           let mediaLocal  =  (datoUno + datoDos) / 2
-          in ((datoUno - mediaLocal)^2 + (datoDos - mediaLocal)^2)
+          in ((datoUno - mediaLocal)^2 + (datoDos - mediaLocal)^2) / 2
 
 -- Ejercicio 5 Usa guards para selecionar la temperatura correcta.
 clasificaTemperatura :: Int -> String
 clasificaTemperatura temperatura 
-                       | (temperatura <= 0) = "frio extremo"
-                       | (temperatura > 0 && temperatura <= 18) = "frio"
-                       | (temperatura > 18 && temperatura <= 23) = "templado"
-                       | (temperatura > 23 && temperatura <= 32) = "calido" 
-                       | otherwise = "calor extremo"
+             | temperatura <= 0  = "frio extremo"
+             | temperatura <= 15 = "frio"
+             | temperatura <= 25 = "templado"
+             | temperatura <= 35 = "calido" 
+             | otherwise    = "calor extremo"
 
 
 -- Ejercicio 6 Separador de elementos usando recuersión 
@@ -41,6 +42,7 @@ intercala nuevoVal (y:ys) =  y :  nuevoVal : intercala  nuevoVal ys
 data Expr = Lit Int
           | Suma Expr Expr 
           | Producto Expr Expr
+          deriving (Eq, Show)
 
 -- Creación de el evaluador algebraico para Expr
 evalua :: Expr -> Int
