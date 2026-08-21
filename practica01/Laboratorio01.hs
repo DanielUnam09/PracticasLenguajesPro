@@ -34,5 +34,19 @@ intercala :: a -> [a] -> [a]
 intercala nuevoVal []  = []
 intercala nuevoVal [x] = [x]
 intercala nuevoVal (y:ys) =  y :  nuevoVal : intercala  nuevoVal ys
+
+-- Ejercicio 7 Creación de data y evaluación algebraica. 
+
+-- Creación de data Expr 
+data Expr = Lit Int
+          | Suma Expr Expr 
+          | Producto Expr Expr
+
+-- Creación de el evaluador algebraico para Expr
+evalua :: Expr -> Int
+evalua (Lit n) = n
+evalua (Suma expr1 expr2) = evalua expr1 + evalua expr2
+evalua (Producto expr1 expr2) = evalua expr1 * evalua expr2
+
  
 
