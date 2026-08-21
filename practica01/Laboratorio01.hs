@@ -17,7 +17,7 @@ aplicaTresVeces f x = (f (f (f x)))
 varianza2 :: Double -> Double -> Double 
 varianza2 datoUno datoDos = 
           let mediaLocal  =  (datoUno + datoDos) / 2
-          in ((datoUno - mediaLocal)^2 + (datoDos - mediaLocal)^2)
+          in ((datoUno - mediaLocal)^2 + (datoDos - mediaLocal)^2) / 2
 
 -- Ejercicio 5 Usa guards para selecionar la temperatura correcta.
 clasificaTemperatura :: Int -> String
