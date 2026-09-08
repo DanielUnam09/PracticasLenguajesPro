@@ -4,7 +4,7 @@ import Data.List (nub, sort)
 import Grammars
 import Interp
 import Lexer
-import MiniLispPlusPlus (evalua)
+import Interp (bigStep)
 import Test.QuickCheck
 
 -- Generadores ---------------------------------------------------------------
@@ -136,6 +136,11 @@ namesRef (LetStar bs body) =
 
 parsea :: String -> ASA
 parsea = parse . lexer
+
+evalua :: String -> ASA
+evalua texto = case bigStep (parsea texto) of
+  Just resultado -> resultado
+  Nothing -> error "evalua: la expresion no se pudo evaluar"
 
 -- Reto 1: lexer --------------------------------------------------------------
 

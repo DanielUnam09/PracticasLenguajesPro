@@ -1,6 +1,7 @@
 module Interp where
 
 import Grammars
+import Data.List (union, (\\), nub)
 
 -- RETO 3: sustitucion nominal que evita captura
 
@@ -123,7 +124,17 @@ sust (LetStar ((y, e):bs) body) x s
 -- | Sustitucion simultanea para Let (evalua todas las asignaciones al mismo tiempo)
 sustMany :: ASA -> [Binding] -> ASA
 sustMany expr [] = expr
-sustMany expr bs = foldl (\acc (x, v) -> sust acc x v) expr bs
+sustMany expr bs = step2
+  where
+    (xs, vs) = unzip bs
+    baseUsed = names expr `union` xs `union` foldr union [] (map names vs)
+    tmps = freshNames baseUsed (length bs)
+    step1 = foldl (\acc (x, t) -> sust acc x (Id t)) expr (zip xs tmps)
+    step2 = foldl (\acc (t, v) -> sust acc t v) step1 (zip tmps vs)
+
+freshNames :: [String] -> Int -> [String]
+freshNames _ 0 = []
+freshNames used n = let z = freshName used in z : freshNames (z : used) (n - 1)
 
 -- RETO 4: semantica operacional de paso grande
 -- let es simultaneo; let* se evalua directamente, asociacion por asociacion.
@@ -205,10 +216,13 @@ bigStep (ZeroP e) = do
   Num n <- bigStep e
   return (Boolean (n == 0))
 
-bigStep (Let bindings body) = do
-  let (xs, es) = unzip bindings
-  vs <- mapM bigStep es
-  bigStep (sustMany body (zip xs vs))
+bigStep (Let bindings body)
+  | length xs /= length (nub xs) = Nothing
+  | otherwise = do
+      vs <- mapM bigStep es
+      bigStep (sustMany body (zip xs vs))
+  where
+    (xs, es) = unzip bindings
 
 bigStep (LetStar [] body) = bigStep body
 bigStep (LetStar ((x1,e1):rest) body) = do
