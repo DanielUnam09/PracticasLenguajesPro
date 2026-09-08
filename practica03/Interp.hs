@@ -128,3 +128,106 @@ sustMany expr bs = foldl (\acc (x, v) -> sust acc x v) expr bs
 -- RETO 4: semantica operacional de paso grande
 -- let es simultaneo; let* se evalua directamente, asociacion por asociacion.
 bigStep :: ASA -> Maybe ASA
+
+bigStep (Num n) = Just (Num n)
+bigStep (Boolean b) = Just (Boolean b)
+bigStep (Id _) = Nothing
+
+bigStep (And es) = do
+  vs <- mapM bigStep es
+  bs <- mapM asBoolean vs
+  return (Boolean (and bs))
+
+bigStep (Or es) = do
+  vs <- mapM bigStep es
+  bs <- mapM asBoolean vs
+  return (Boolean (or bs))
+
+bigStep (Add es) = do
+  vs <- mapM bigStep es
+  ns <- mapM asNum vs
+  return (Num (sum ns))
+
+bigStep (Mul es) = do
+  vs <- mapM bigStep es
+  ns <- mapM asNum vs
+  return (Num (product ns))
+
+bigStep (Sub es) = do
+  vs <- mapM bigStep es
+  ns <- mapM asNum vs
+  case ns of
+    (n:rest) -> return (Num (foldl (\a b -> max 0 (a - b)) n rest))
+    []       -> Nothing
+
+bigStep (Div es) = do
+  vs <- mapM bigStep es
+  ns <- mapM asNum vs
+  case ns of
+    (n:rest) | 0 `elem` rest -> Nothing
+             | otherwise     -> return (Num (foldl div n rest))
+    [] -> Nothing
+
+bigStep (Lt es) = chainCompare (<)  es
+bigStep (Gt es) = chainCompare (>)  es
+bigStep (Le es) = chainCompare (<=) es
+bigStep (Ge es) = chainCompare (>=) es
+
+bigStep (Expt e1 e2) = do
+  Num n <- bigStep e1
+  Num m <- bigStep e2
+  return (Num (n ^ m))
+
+bigStep (EqP e1 e2) = do
+  v1 <- bigStep e1
+  v2 <- bigStep e2
+  case (v1, v2) of
+    (Num n, Num m)           -> return (Boolean (n == m))
+    (Boolean b1, Boolean b2) -> return (Boolean (b1 == b2))
+    _                        -> Nothing
+
+bigStep (Not e) = do
+  v <- bigStep e
+  case v of
+    Boolean b -> return (Boolean (not b))
+    Num _     -> return (Boolean False)
+    _         -> Nothing
+
+bigStep (Add1 e) = do
+  Num n <- bigStep e
+  return (Num (n + 1))
+
+bigStep (Sub1 e) = do
+  Num n <- bigStep e
+  return (Num (max 0 (n - 1)))
+
+bigStep (ZeroP e) = do
+  Num n <- bigStep e
+  return (Boolean (n == 0))
+
+bigStep (Let bindings body) = do
+  let (xs, es) = unzip bindings
+  vs <- mapM bigStep es
+  bigStep (sustMany body (zip xs vs))
+
+bigStep (LetStar [] body) = bigStep body
+bigStep (LetStar ((x1,e1):rest) body) = do
+  v1 <- bigStep e1
+  bigStep (sust (LetStar rest body) x1 v1)
+
+bigStep _ = Nothing
+
+-- funciones aux
+asNum :: ASA -> Maybe Int
+asNum (Num n) = Just n
+asNum _       = Nothing
+
+asBoolean :: ASA -> Maybe Bool
+asBoolean (Boolean b) = Just b
+asBoolean _           = Nothing
+
+chainCompare :: (Int -> Int -> Bool) -> [ASA] -> Maybe ASA
+chainCompare op es = do
+  vs <- mapM bigStep es
+  ns <- mapM asNum vs
+  return (Boolean (and (zipWith op ns (tail ns))))
