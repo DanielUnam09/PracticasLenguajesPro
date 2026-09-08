@@ -63,6 +63,9 @@ ASA : nat                           { Num $1 }
 
 Args : ASA ASA                       { [$1, $2] }
      | ASA Args                      { $1 : $2 }
+Bindings : Binding { [$1] }
+         | Binding Bindings { $1 : $2 }
+Binding : '(' var ASA ')' { ($2, $3) }
 
 {
 parseError :: [Token] -> a
