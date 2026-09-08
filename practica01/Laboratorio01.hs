@@ -50,5 +50,17 @@ evalua (Lit n) = n
 evalua (Suma expr1 expr2) = evalua expr1 + evalua expr2
 evalua (Producto expr1 expr2) = evalua expr1 * evalua expr2
 
+
+recorrer :: [a] -> [a]
+recorrer [] = []
+recorrer (x : xs) filtra x [a] : recorrer xs
+
+filtra :: a -> [a] 
+filtra [] = a : [a]
+filtra (x : xs) = 
+    if x == a
+    then ()
+    else filtra xs
+
  
 
