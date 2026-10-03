@@ -27,9 +27,10 @@ tokens :-
   let                   { \_ -> TokenLet }
   lambda                { \_ -> TokenLambda }
 
-  -- RETO 1
-  -- Agrega aqui las reglas para if, cond, else y letrec. Las palabras
-  -- reservadas deben aparecer antes de la regla general de identificadores.
+  if                    { \_ -> TokenIf }
+  cond                  { \_ -> TokenCond }
+  else                  { \_ -> TokenElse }
+  letrec                { \_ -> TokenLetRec }
 
   "#t"                  { \_ -> TokenBool True }
   "#f"                  { \_ -> TokenBool False }
