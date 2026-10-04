@@ -4,7 +4,12 @@ import Control.Monad.IO.Class (liftIO)
 import Grammars
 import Interp
 import Lexer
-import System.Console.Haskeline (InputT, defaultSettings, getInputLine, runInputT)
+import System.Console.Haskeline
+  ( InputT,
+    defaultSettings,
+    getInputLine,
+    runInputT
+  )
 
 -- RETO 5: integrar el combinador Y ----------------------------------------
 
@@ -14,13 +19,36 @@ import System.Console.Haskeline (InputT, defaultSettings, getInputLine, runInput
 --       (lambda x. f (x x))
 --       (lambda x. f (x x))
 combinadorY :: ASA
+combinadorY =
+  Fun
+    "f"
+    (App
+      (Fun
+        "x"
+        (App
+          (Id "f")
+          (App (Id "x") (Id "x"))))
+      (Fun
+        "x"
+        (App
+          (Id "f")
+          (App (Id "x") (Id "x")))))
 
 -- Evalua combinadorY en el ambiente vacio y asocia su valor con el nombre Y.
 prelude :: Env
+prelude =
+  case bigStep [] combinadorY of
+    Just valor -> [("Y", valor)]
+    Nothing    -> []
 
 -- Integra el analisis, el desazucarado y la evaluacion desde prelude.
 -- El resultado final debe pasar por strict antes de devolverse.
 evalua :: String -> Maybe Value
+evalua entrada = do
+  asaSuperficial <- Just (parse (lexer entrada))
+  asaNucleo <- desugar asaSuperficial
+  valor <- bigStep prelude asaNucleo
+  strict valor
 
 -- Infraestructura provista. No forma parte de los retos.
 repl :: IO ()
