@@ -36,19 +36,13 @@ combinadorY =
 
 -- Evalua combinadorY en el ambiente vacio y asocia su valor con el nombre Y.
 prelude :: Env
-prelude =
-  case bigStep [] combinadorY of
-    Just valor -> [("Y", valor)]
-    Nothing    -> []
+prelude = maybe [] (\valor -> [("Y", valor)]) (bigStep [] combinadorY)
 
 -- Integra el analisis, el desazucarado y la evaluacion desde prelude.
 -- El resultado final debe pasar por strict antes de devolverse.
 evalua :: String -> Maybe Value
-evalua entrada = do
-  asaSuperficial <- Just (parse (lexer entrada))
-  asaNucleo <- desugar asaSuperficial
-  valor <- bigStep prelude asaNucleo
-  strict valor
+evalua entrada =
+  desugar (parse (lexer entrada)) >>= bigStep prelude >>= strict
 
 -- Infraestructura provista. No forma parte de los retos.
 repl :: IO ()

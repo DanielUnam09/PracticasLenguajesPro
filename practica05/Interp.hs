@@ -1,3 +1,4 @@
+
 module Interp where
 
 import Grammars
@@ -30,22 +31,21 @@ type Env = [(Nombre, Value)]
 curryFun :: [Nombre] -> ASA -> Maybe ASA
 curryFun [] _ = Nothing
 curryFun [x] cuerpo = Just (Fun x cuerpo)
-curryFun (x:xs) cuerpo = do
-  resto <- curryFun xs cuerpo
-  return (Fun x resto)
+curryFun (x:xs) cuerpo =
+  curryFun xs cuerpo >>= \resultado ->
+  Just (Fun x resultado)
 
 curryApp :: ASA -> [ASA] -> Maybe ASA
 curryApp _ [] = Nothing
 curryApp f [a] = Just (App f a)
-curryApp f (a:as) = do
-  resto <- curryApp (App f a) as
-  return resto
+curryApp f (a : as) =
+  curryApp (App f a) as
 
 binaryOp :: (ASA -> ASA -> ASA) -> [ASA] -> Maybe ASA
 binaryOp _ [] = Nothing
 binaryOp _ [_] = Nothing
-binaryOp op (x:y:xs) =
-  Just (foldl op (op x y) xs)
+binaryOp op (a : b : xs) =
+  Just (foldl op (op a b) xs)
 
 -- Desazucara las clausulas ordinarias de cond en If anidados. La alternativa
 -- else es el ultimo argumento y se conserva como la rama final.
@@ -53,11 +53,11 @@ desugarCond :: [(SASA, SASA)] -> SASA -> Maybe ASA
 desugarCond [] alternativa =
   desugar alternativa
 
-desugarCond ((condicion, expresion):resto) alternativa = do
-  c <- desugar condicion
-  e <- desugar expresion
-  r <- desugarCond resto alternativa
-  return (If c e r)
+desugarCond ((condicion, rama) : clausulas) alternativa =
+  desugar condicion >>= \c ->
+  desugar rama >>= \r ->
+  desugarCond clausulas alternativa >>= \resto ->
+  Just (If c r resto)
 
 -- Elimina toda la sintaxis superficial. CondS se traduce a If anidados.
 -- LetRecS f definicion cuerpo se traduce usando el identificador Y:
@@ -65,10 +65,11 @@ desugarCond ((condicion, expresion):resto) alternativa = do
 --   LetS f (AppS (IdS "Y") (FunS [f] definicion)) cuerpo
 --
 -- y despues se elimina tambien ese LetS. LetRecS no pertenece al nucleo.
-desugar :: SASA -> Maybe ASA
 
-desugar (IdS x) =
-  Just (Id x)
+
+desugar :: SASA -> Maybe ASA
+desugar (IdS nombre) =
+  Just (Id nombre)
 
 desugar (NumS n) =
   Just (Num n)
@@ -76,59 +77,54 @@ desugar (NumS n) =
 desugar (BooleanS b) =
   Just (Boolean b)
 
-desugar (AddS xs) = do
-  ys <- mapM desugar xs
-  binaryOp Add ys
+desugar (AddS operandos) =
+  mapM desugar operandos >>= binaryOp Add
 
-desugar (SubS xs) = do
-  ys <- mapM desugar xs
-  binaryOp Sub ys
+desugar (SubS operandos) =
+  mapM desugar operandos >>= binaryOp Sub
 
-desugar (NotS e) = do
-  e' <- desugar e
-  return (Not e')
+desugar (NotS expresion) =
+  desugar expresion >>= \e ->
+  Just (Not e)
 
-desugar (LetS x e cuerpo) = do
-  e' <- desugar e
-  cuerpo' <- desugar cuerpo
-  return (App (Fun x cuerpo') e')
+desugar (LetS nombre definicion cuerpo) =
+  desugar definicion >>= \d ->
+  desugar cuerpo >>= \c ->
+  Just (App (Fun nombre c) d)
 
-desugar (LetStarS [] cuerpo) =
-  desugar cuerpo
+desugar (LetStarS bindings cuerpo) =
+  desugarLetStar bindings cuerpo
 
-desugar (LetStarS ((x, e):resto) cuerpo) =
-  desugar
-    (LetS
-      x
-      e
-      (LetStarS resto cuerpo))
+desugar (FunS parametros cuerpo) =
+  desugar cuerpo >>= curryFun parametros
 
-desugar (FunS params cuerpo) = do
-  cuerpo' <- desugar cuerpo
-  curryFun params cuerpo'
+desugar (AppS funcion argumentos) =
+  desugar funcion >>= \f ->
+  mapM desugar argumentos >>= curryApp f
 
-desugar (AppS f args) = do
-  f' <- desugar f
-  args' <- mapM desugar args
-  curryApp f' args'
-
-desugar (IfS condicion entonces sino) = do
-  condicion' <- desugar condicion
-  entonces' <- desugar entonces
-  sino' <- desugar sino
-  return (If condicion' entonces' sino')
+desugar (IfS condicion consecuente alternativa) =
+  desugar condicion >>= \c ->
+  desugar consecuente >>= \t ->
+  desugar alternativa >>= \e ->
+  Just (If c t e)
 
 desugar (CondS clausulas alternativa) =
   desugarCond clausulas alternativa
 
-desugar (LetRecS f definicion cuerpo) =
+desugar (LetRecS nombre definicion cuerpo) =
   desugar
-    (LetS
-      f
-      (AppS
-        (IdS "Y")
-        [FunS [f] definicion])
+    (LetS nombre
+      (AppS (IdS "Y") [FunS [nombre] definicion])
       cuerpo)
+
+desugarLetStar :: [(Nombre, SASA)] -> SASA -> Maybe ASA
+desugarLetStar [] cuerpo =
+  desugar cuerpo
+
+desugarLetStar ((nombre, definicion) : bindings) cuerpo =
+  desugarLetStar bindings cuerpo >>= \c ->
+  desugar definicion >>= \d ->
+  Just (App (Fun nombre c) d)
 
 -- RETO 4: evaluacion perezosa con alcance estatico ------------------------
 
@@ -143,10 +139,10 @@ lookupEnv x ((y, valor):resto)
 
 -- Exige una cerradura de expresion usando el ambiente guardado. Si al
 -- evaluarla se obtiene otra ExprV, continua hasta producir otro valor.
+
 strict :: Value -> Maybe Value
-strict (ExprV expresion ambiente) = do
-  valor <- bigStep ambiente expresion
-  strict valor
+strict (ExprV expresion ambiente) =
+  bigStep ambiente expresion >>= strict
 
 strict valor =
   Just valor
@@ -161,6 +157,23 @@ strict valor =
 -- * If exige solamente la condicion y evalua una sola rama.
 --
 -- La resta sobre naturales permanece truncada en cero.
+
+numValue :: Value -> Maybe Int
+numValue (NumV n) = Just n
+numValue _        = Nothing
+
+boolValue :: Value -> Maybe Bool
+boolValue (BooleanV b) = Just b
+boolValue _            = Nothing
+
+closureParts :: Value -> Maybe (Nombre, ASA, Env)
+closureParts (ClosureV p cuerpo ambienteDef) = Just (p, cuerpo, ambienteDef)
+closureParts _                               = Nothing
+
+numOperando :: Env -> ASA -> Maybe Int
+numOperando ambiente e =
+  bigStep ambiente e >>= strict >>= numValue
+
 bigStep :: Env -> ASA -> Maybe Value
 
 bigStep _ (Num n) =
@@ -175,53 +188,24 @@ bigStep ambiente (Id x) =
 bigStep ambiente (Fun parametro cuerpo) =
   Just (ClosureV parametro cuerpo ambiente)
 
-bigStep ambiente (Add izquierda derecha) = do
-  vi <- bigStep ambiente izquierda >>= strict
-  vd <- bigStep ambiente derecha >>= strict
+bigStep ambiente (Add izquierda derecha) =
+  (\n m -> NumV (n + m)) <$> numOperando ambiente izquierda <*> numOperando ambiente derecha
 
-  case (vi, vd) of
-    (NumV n, NumV m) ->
-      Just (NumV (n + m))
-    _ ->
-      Nothing
+bigStep ambiente (Sub izquierda derecha) =
+  (\n m -> NumV (max 0 (n - m))) <$> numOperando ambiente izquierda <*> numOperando ambiente derecha
 
-bigStep ambiente (Sub izquierda derecha) = do
-  vi <- bigStep ambiente izquierda >>= strict
-  vd <- bigStep ambiente derecha >>= strict
+bigStep ambiente (Not expresion) =
+  BooleanV . not <$> (bigStep ambiente expresion >>= strict >>= boolValue)
 
-  case (vi, vd) of
-    (NumV n, NumV m) ->
-      Just (NumV (max 0 (n - m)))
-    _ ->
-      Nothing
 
-bigStep ambiente (Not expresion) = do
-  valor <- bigStep ambiente expresion >>= strict
+bigStep ambiente (If condicion entonces sino) =
+  (bigStep ambiente condicion >>= strict >>= boolValue) >>= escogeRama
+  where
+    escogeRama True  = bigStep ambiente entonces
+    escogeRama False = bigStep ambiente sino
 
-  case valor of
-    BooleanV b ->
-      Just (BooleanV (not b))
-    _ ->
-      Nothing
-
-bigStep ambiente (If condicion entonces sino) = do
-  valor <- bigStep ambiente condicion >>= strict
-
-  case valor of
-    BooleanV True ->
-      bigStep ambiente entonces
-    BooleanV False ->
-      bigStep ambiente sino
-    _ ->
-      Nothing
-
-bigStep ambiente (App funcion argumento) = do
-  valorFuncion <- bigStep ambiente funcion >>= strict
-
-  case valorFuncion of
-    ClosureV parametro cuerpo ambienteDefinicion ->
-      bigStep
-        ((parametro, ExprV argumento ambiente) : ambienteDefinicion)
-        cuerpo
-    _ ->
-      Nothing
+bigStep ambiente (App funcion argumento) =
+  (bigStep ambiente funcion >>= strict >>= closureParts) >>= aplica
+  where
+    aplica (parametro, cuerpo, ambienteDefinicion) =
+      bigStep ((parametro, ExprV argumento ambiente) : ambienteDefinicion) cuerpo
